@@ -4,7 +4,7 @@
   <title>Todo App</title>
   <style>
     body { font-family: Arial; max-width: 500px; margin: auto; }
-    li { display: flex; justify-content: space-between; }
+    li { display: flex; justify-content: space-between; margin: 5px 0; }
   </style>
 </head>
 <body>
@@ -12,7 +12,6 @@
 <h2>Todo List</h2>
 
 <input type="date" id="datePicker" />
-
 <ul id="list"></ul>
 
 <input type="text" id="taskInput" placeholder="Tambah tugas" />
@@ -22,11 +21,11 @@
 const API = '';
 
 function getDateParts() {
-  const date = new Date(document.getElementById('datePicker').value);
+  const d = new Date(document.getElementById('datePicker').value);
   return {
-    year: date.getFullYear(),
-    month: date.getMonth() + 1,
-    day: date.getDate()
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate()
   };
 }
 
@@ -47,7 +46,7 @@ async function loadTodos() {
       </span>
       <div>
         <button onclick="toggle(${todo.id}, ${todo.is_done})">✔</button>
-        <button onclick="remove(${todo.id})">❌</button>
+        <button onclick="removeTodo(${todo.id})">❌</button>
       </div>
     `;
 
@@ -79,12 +78,11 @@ async function toggle(id, current) {
   loadTodos();
 }
 
-async function remove(id) {
+async function removeTodo(id) {
   await fetch(`${API}/todos/${id}`, { method: 'DELETE' });
   loadTodos();
 }
 
-// default hari ini
 const today = new Date().toISOString().split('T')[0];
 document.getElementById('datePicker').value = today;
 

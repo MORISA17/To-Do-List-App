@@ -1,17 +1,19 @@
-// =========================
-// FULLSTACK TODO APP
-// Backend: Node.js + Express + SQLite
-// Frontend: Vanilla HTML + JS
-// =========================
+// =============================
+// TODO APP (RAILWAY READY)
+// Backend + Frontend
+// FIXED: using better-sqlite3
+// =============================
 
-// ===== 1. INSTALL DEPENDENCIES =====
+// INSTALL:
 // npm init -y
-// npm install express sqlite3 cors
+// npm install express better-sqlite3 cors
 
-// ===== 2. BACKEND (server.js) =====
+// =============================
+// server.js
+// =============================
 
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const cors = require('cors');
 
 const app = express();
@@ -19,11 +21,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Database setup
-const db = new sqlite3.Database('./todos.db');
+// DB (Railway safe path)
+const db = new Database('/tmp/todos.db');
 
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS todos (
+// create table
+ db.prepare(`
+  CREATE TABLE IF NOT EXISTS todos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     year INTEGER,
     month INTEGER,
@@ -31,65 +34,80 @@ db.serialize(() => {
     task TEXT,
     is_done INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-});
+  )
+`).run();
 
-// GET todos by date
+// GET
 app.get('/todos', (req, res) => {
   const { year, month, day } = req.query;
-  db.all(
-    `SELECT * FROM todos WHERE year=? AND month=? AND day=? ORDER BY id DESC`,
-    [year, month, day],
-    (err, rows) => {
-      if (err) return res.status(500).json(err);
-      res.json(rows);
-    }
-  );
+
+  const rows = db
+    .prepare('SELECT * FROM todos WHERE year=? AND month=? AND day=? ORDER BY id DESC')
+    .all(year, month, day);
+
+  res.json(rows);
 });
 
-// ADD todo
+// POST
 app.post('/todos', (req, res) => {
   const { year, month, day, task } = req.body;
-  db.run(
-    `INSERT INTO todos (year, month, day, task) VALUES (?, ?, ?, ?)`,
-    [year, month, day, task],
-    function (err) {
-      if (err) return res.status(500).json(err);
-      res.json({ id: this.lastID });
-    }
-  );
+
+  const result = db
+    .prepare('INSERT INTO todos (year, month, day, task) VALUES (?, ?, ?, ?)')
+    .run(year, month, day, task);
+
+  res.json({ id: result.lastInsertRowid });
 });
 
-// TOGGLE DONE
+// TOGGLE
 app.put('/todos/:id', (req, res) => {
   const { is_done } = req.body;
-  db.run(
-    `UPDATE todos SET is_done=? WHERE id=?`,
-    [is_done, req.params.id],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ success: true });
-    }
-  );
+
+  db.prepare('UPDATE todos SET is_done=? WHERE id=?')
+    .run(is_done, req.params.id);
+
+  res.json({ success: true });
 });
 
 // DELETE
 app.delete('/todos/:id', (req, res) => {
-  db.run(`DELETE FROM todos WHERE id=?`, [req.params.id], (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ success: true });
-  });
+  db.prepare('DELETE FROM todos WHERE id=?')
+    .run(req.params.id);
+
+  res.json({ success: true });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server running on port ' + PORT));
+app.listen(PORT, () => console.log('Server running on ' + PORT));
 
 
-// ===== 3. FRONTEND (public/index.html) =====
+// =============================
+// package.json (IMPORTANT)
+// =============================
 
 /*
-Buat folder bernama "public", lalu isi file index.html:
+{
+  "name": "todo-app",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
 */
+
+
+// =============================
+// public/index.html
+// =============================
 
 /*
 <!DOCTYPE html>
@@ -98,7 +116,7 @@ Buat folder bernama "public", lalu isi file index.html:
   <title>Todo App</title>
   <style>
     body { font-family: Arial; max-width: 500px; margin: auto; }
-    li { display: flex; justify-content: space-between; }
+    li { display: flex; justify-content: space-between; margin: 5px 0; }
   </style>
 </head>
 <body>
@@ -106,7 +124,6 @@ Buat folder bernama "public", lalu isi file index.html:
 <h2>Todo List</h2>
 
 <input type="date" id="datePicker" />
-
 <ul id="list"></ul>
 
 <input type="text" id="taskInput" placeholder="Tambah tugas" />
@@ -116,11 +133,11 @@ Buat folder bernama "public", lalu isi file index.html:
 const API = '';
 
 function getDateParts() {
-  const date = new Date(document.getElementById('datePicker').value);
+  const d = new Date(document.getElementById('datePicker').value);
   return {
-    year: date.getFullYear(),
-    month: date.getMonth() + 1,
-    day: date.getDate()
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate()
   };
 }
 
@@ -141,7 +158,7 @@ async function loadTodos() {
       </span>
       <div>
         <button onclick="toggle(${todo.id}, ${todo.is_done})">✔</button>
-        <button onclick="remove(${todo.id})">❌</button>
+        <button onclick="removeTodo(${todo.id})">❌</button>
       </div>
     `;
 
@@ -173,12 +190,11 @@ async function toggle(id, current) {
   loadTodos();
 }
 
-async function remove(id) {
+async function removeTodo(id) {
   await fetch(`${API}/todos/${id}`, { method: 'DELETE' });
   loadTodos();
 }
 
-// default hari ini
 const today = new Date().toISOString().split('T')[0];
 document.getElementById('datePicker').value = today;
 
@@ -191,15 +207,6 @@ loadTodos();
 </html>
 */
 
-
-// ===== 4. CARA JALANKAN =====
-// node server.js
-// buka http://localhost:3000
-
-
-// ===== 5. DEPLOY =====
-// Gunakan Railway / Render
-// Pastikan tambahkan:
-// - package.json start script: "start": "node server.js"
-
-// SELESAI 🚀
+// =============================
+// DONE ✅
+// =============================
