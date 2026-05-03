@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Todo App</title>
+  <style>
+    body { font-family: Arial; max-width: 500px; margin: auto; }
+    li { display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+
+<h2>Todo List</h2>
+
+<input type="date" id="datePicker" />
+
+<ul id="list"></ul>
+
+<input type="text" id="taskInput" placeholder="Tambah tugas" />
+<button onclick="addTodo()">Tambah</button>
+
+<script>
+const API = '';
+
+function getDateParts() {
+  const date = new Date(document.getElementById('datePicker').value);
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate()
+  };
+}
+
+async function loadTodos() {
+  const { year, month, day } = getDateParts();
+  const res = await fetch(`${API}/todos?year=${year}&month=${month}&day=${day}`);
+  const data = await res.json();
+
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+
+  data.forEach(todo => {
+    const li = document.createElement('li');
+
+    li.innerHTML = `
+      <span style="text-decoration:${todo.is_done ? 'line-through' : 'none'}">
+        ${todo.task}
+      </span>
+      <div>
+        <button onclick="toggle(${todo.id}, ${todo.is_done})">✔</button>
+        <button onclick="remove(${todo.id})">❌</button>
+      </div>
+    `;
+
+    list.appendChild(li);
+  });
+}
+
+async function addTodo() {
+  const input = document.getElementById('taskInput');
+  const { year, month, day } = getDateParts();
+
+  await fetch(`${API}/todos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ year, month, day, task: input.value })
+  });
+
+  input.value = '';
+  loadTodos();
+}
+
+async function toggle(id, current) {
+  await fetch(`${API}/todos/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_done: current ? 0 : 1 })
+  });
+
+  loadTodos();
+}
+
+async function remove(id) {
+  await fetch(`${API}/todos/${id}`, { method: 'DELETE' });
+  loadTodos();
+}
+
+// default hari ini
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('datePicker').value = today;
+
+document.getElementById('datePicker').addEventListener('change', loadTodos);
+
+loadTodos();
+</script>
+
+</body>
+</html>
